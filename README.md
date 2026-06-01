@@ -260,6 +260,6 @@ This repository is maintained as a personal study copy. The original codebase is
 
 <div align="center">
 
-*Last updated — study copy maintained by NOVEM*
+*Last updated — study copy maintained by MIN THU KYAW*
 
 </div>
