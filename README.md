@@ -1,4 +1,4 @@
-<h1>AIproject : Dual-System VLA Model with Critical Re-evaluation Text for Planner Performance Improvement</h1>
+<h1> Dual-System VLA Model with Critical Re-evaluation Text for Planner Performance Improvement</h1>
 
 **Critical text And Dual System Vision Language Action Model (CADS-VLA)**
 
