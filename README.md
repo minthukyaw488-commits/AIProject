@@ -1,287 +1,289 @@
-<h1>AIproject : 비판적 재평가 텍스트를 통한 planner Model 성능 개선 듀얼 시스템 VLA 모델 개발</h1> 
+<h1>AIproject : Dual-System VLA Model with Critical Re-evaluation Text for Planner Performance Improvement</h1>
 
-**Critical text And Dual System Vision Language Action Model(CADS-VLA)**
+**Critical text And Dual System Vision Language Action Model (CADS-VLA)**
 
 <a href="https://pytorch.org/get-started/locally/">
   <img src="https://img.shields.io/badge/PYTORCH-Qwen%202.6.0%20cu124-brightgreen?style=flat-square&label=PYTORCH&labelColor=%23eeeeee&color=%23d63f3a" height="40"/>
 </a>
 &nbsp;
 <a href="https://pytorch.org/get-started/locally/">
-  <img src="https://img.shields.io/badge/PYTORCH-openvla%202.12.0%20%2Bcpu%20-brightgreen?style=flat-square&label=PYTORCH&labelColor=%23eeeeee&color=%23d63f3a" height="40"/>
+  <img src="https://img.shields.io/badge/PYTORCH-openvla%20%2Bcpu-brightgreen?style=flat-square&label=PYTORCH&labelColor=%23eeeeee&color=%23d63f3a" height="40"/>
 </a>
 &nbsp;
 <a href="https://www.python.org/">
-  <img src="https://img.shields.io/badge/Python-3.10-brightgreen?style=flat-square&label=Python&labelColor=%23eeeeee&color=%2355adf4"height="40"/>
+  <img src="https://img.shields.io/badge/Python-3.10-brightgreen?style=flat-square&label=Python&labelColor=%23eeeeee&color=%2355adf4" height="40"/>
 </a>
 
 ---
-**Planner** : OpenVLA 7B fine tuning + 4bit, Frozen, CPU inference 
 
-**Actor 1** : Qwen2.5VL 3B + 4bit + LoRA + GRPO
+## Model Configuration
 
-**Actor 2** : SmolVLM 500M + 4bit + LoRA + GRPO <- **(use)**
+| Role | Model | Setup |
+| --- | --- | --- |
+| **Planner** | OpenVLA 7B (fine-tuned) | 4bit · Frozen · CPU inference |
+| **Actor 1** | Qwen2.5-VL 3B | 4bit · LoRA · GRPO |
+| **Actor 2** ✅ (in use) | SmolVLM 500M | 4bit · LoRA · GRPO |
+| **Simulator** | LIBERO (libero_10) | — |
 
-**Simulator** : LIBERO (libero_10)
+---
 
+## Backbone Model References
 
-## Back Bone Model URL
+- **OpenVLA** : [openvla](https://github.com/openvla/openvla.git)
+- **Qwen2.5-VL** : [Qwen2.5VL](https://github.com/huggingface/transformers/tree/main/src/transformers/models/qwen2_5_vl)
+- **SmolVLM** : [SmolVLM](https://github.com/huggingface/smollm/tree/main)
+- **LIBERO** : [LIBERO](https://github.com/Lifelong-Robot-Learning/LIBERO.git)
 
-**- OpenVLA** : [openvla](https://github.com/openvla/openvla.git)
+---
 
-**- Qwen2.5VL** : [Qwen2.5VL](https://github.com/huggingface/transformers/tree/main/src/transformers/models/qwen2_5_vl)
-
-**- SmolVLM** : [SmolVLM](https://github.com/huggingface/smollm/tree/main)
-
-**- LIBERO** : [LIBERO](https://github.com/Lifelong-Robot-Learning/LIBERO.git)
-
-## 🖼️Model Figure 
+## 🖼️ Model Figures
 
 ![Figure1](https://github.com/user-attachments/assets/edbb073d-d40e-452a-873f-a4de54bc41b6)
-- **1. Model Structure**
 
- 모델의 전체적 구조를 간단하게 도식화 함. planner의 openvla 모델은 forzen으로 사용. actor의 backbone 모델은 LVM 모델 중 매우 가벼운 SmolVLM 500M을 사용. Planner는 action token id를 actor로 전달. actor는 이를 openvla embedding table로 받아 projection layer를 거쳐 차원을 맞춘 뒤 image와 text를 smolvlm의 processor를 거친 임베딩과 concat함. 이후 llm을 거쳐 나온 임베딩을 detoken 과정을 거쳐 텍스트로 표현되고 로봇이 액션. 로봇의 액션 성공 실패 여부로 reward를 받아 GRPO 학습 커리큘럼을 통해 학습됨. 
- 
+### 1. Model Structure
+
+A high-level diagram of the overall model architecture. The Planner uses OpenVLA in frozen mode. The Actor uses SmolVLM 500M as its backbone — a very lightweight choice among large vision-language models. The Planner produces action token IDs and passes them to the Actor. The Actor receives these through the OpenVLA embedding table, passes them through a projection layer to match dimensions, and concatenates them with the image and text embeddings produced by SmolVLM's processor. The resulting embeddings go through the LLM and are detokenized back into text, with the robot then executing the action. Based on whether the robot's action succeeds or fails, the model receives a reward and is trained through the GRPO learning curriculum.
+
 ---
+
 ![Figure2](https://github.com/user-attachments/assets/15b2c0a8-c4bb-4968-bf58-09bde7475a99)
-- **2. Model Process**
 
- 모델의 전체적 프로세스를 그림으로 표현. planner는 이미지와 텍스트를 openvla 자체 llm과 vit로 처리한 뒤 action token 추론을 통해 action token id를 내보냄. actor는 이미지와 텍스트를 smolvlm 자체 llm과 vit로 처리. planner에서 받아온 action token은 openvla에서 가져온 action embedding table(frozen)을 통해 임베딩으로 변환. 이후 projection layer를 통해 smolvlm의 임베딩 차원으로 변환하여 processor와 concat함. 이때 smolvlm의 tokenizer에는 openvla의 256개 action token이 add 되어있음. 이를 과정을 거쳐 transformer에서 attention 연산을 한 뒤 디토크나이저에서 텍스트를, action token은 action vector의 형태로 로봇으로 들어가고 행동을 함. 
- 
+### 2. Model Process
+
+A visualization of the full model process. The Planner processes image and text through OpenVLA's own LLM and ViT, then infers action tokens and outputs action token IDs. The Actor processes image and text through SmolVLM's own LLM and ViT. The action tokens received from the Planner are converted into embeddings through the OpenVLA action embedding table (frozen), then transformed into SmolVLM's embedding dimension via the projection layer, and concatenated with the processor output. At this point, SmolVLM's tokenizer has had OpenVLA's 256 action tokens added to it. After attention computation in the transformer, text is recovered through the detokenizer, while action tokens are sent to the robot as action vectors to execute.
+
 ---
+
 ![Figure3](https://github.com/user-attachments/assets/e5adbf70-5ef6-4e22-94d6-8828ed1dc6be)
-- **3. FLow Chart**
 
- 모델의 플로우 차트. 모델에서의 전체적인 데이터의 흐름을 표현. planner와 actor의 구조는 앞서 설명한 과정과 같아서 생략. actor와 planner에서 사용하는 이미지, 텍스트 데이터들은 모두 LIBERO 환경에서 수집됨. zeroMQ를 통해 actor가 planner 서버로 넘기는 구조. 위에 actor action tokenizer init 과정에서 256개 액션 토큰을 openvla에서 가져와 add -> action embedding table -> resieze -> projection layer 과정으로 tokenizer를 초기화 시킴. 아래 GRPO trian 과정은 RLinf의 프레임워크를 반영. collect rollout 에서 libero 환경에서의 데이터들을 그룹 사이즈만큼 수집. 이 과정에서 비판적 텍스트와 action token을 추론하여 액션을 수행하고 그에 따른 reward와 loss등을 계산하고 가중치 업데이트를 compute 과정에서 수행. 이후 이를 통해 LoRA를 학습시킴. 
- 
+### 3. Flow Chart
+
+The overall data flow through the model. The Planner and Actor structures are omitted here since they were covered above. All image and text data used by both the Actor and the Planner are collected from the LIBERO environment, and the Actor sends them to the Planner server via zeroMQ. In the Actor action tokenizer initialization step shown above, 256 action tokens are pulled from OpenVLA via the sequence: add → action embedding table → resize → projection layer. The GRPO training process shown below reflects the RLinf framework. The `collect_rollout` step gathers data from the LIBERO environment up to the group size. During this collection, critical text and action tokens are inferred to perform actions, with the corresponding reward and loss calculated, and weight updates performed in the `compute` step. These updates train the LoRA weights.
+
 ---
+
 ![Figure4](https://github.com/user-attachments/assets/1c0fbf23-fe96-475a-8827-3fd545224f3e)
-- **4. Actor Tokenizer Process**
 
- 구현한 actino tokenizer의 구조를 구체화. 각 데이터들은 각각 vision encoder, llm, projection layer를 통과하여 임베딩 형태로 변환되고, input merge와 action injection hook을 통해 같은 공간으로 투영되고 concat을 진행함. 이때 이미지와 텍스트는 smolvlm의 프로세서를 거침. 이후 트랜스포머를 통과하고 출력을 냄.
- 
+### 4. Actor Tokenizer Process
+
+A detailed view of the implemented action tokenizer's structure. Each input is converted into embedding form through its respective vision encoder, LLM, or projection layer. Through the input merge and action injection hook, these embeddings are projected into the same space and concatenated. Image and text inputs go through SmolVLM's processor at this stage. The merged representation then passes through the transformer to produce the output.
+
 ---
+
 ![Figure5](https://github.com/user-attachments/assets/f106f294-3e26-4129-ab98-1bde2140310e)
-- **5. Suprevised Fine Tuning**
-  
- 바로 모델 학습으로 들어가면 모델이 텍스트 포멧과 액션토큰을 어떻게 내보내는지 알지 못함. GRPO 학습에서 계속 패널티를 받고, 수렴하지 못하는 문제 발생 가능. 그래서 SFT를 통해 기본적인 베이스 능력을 학습시킨 뒤 비판적 텍스트와 그에 따른 액션 토큰 수정을 하도록 하기 위함. 총 4개 스테이지로 구성되었고, 스테이지마다 순차적으로 학습.
 
-## github file structure
+### 5. Supervised Fine-Tuning
 
-**📁openvla_planner**
-
-- **openvla inference code**
-  
-  > openvla inference만 하기 위한 코드.
-  >zeroMQ와 통합하여 서버를 열어줌.
-  >**cpu**를 사용하여 inference 할 것 이므로 cuda 사용하지 않음.
-  >transformer로 로드하면 됨.
-  >모델은 **openvla-7b-finetuned-libero-10** 로 로드
-
-- **action tokenizer**
-  
-  > openvla 의 action tokeinzer원본.
-  >확인하면서 코딩하기 위해 편의성으로 유지.
+If we go straight into model training, the model does not yet know the expected text format or how to produce action tokens. This would lead to constant penalties during GRPO training and likely prevent convergence. To address this, SFT is used first to teach the model basic capabilities, so that it can then learn critical text generation and the corresponding action token corrections. SFT consists of 4 stages, trained sequentially.
 
 ---
 
-**📁qwen_actor**
+## Repository File Structure
+
+### 📁 openvla_planner
+
+- **openvla_inference_code**
+  > Inference-only code for OpenVLA.
+  > Integrated with zeroMQ to open a server.
+  > Uses CPU for inference, so CUDA is not used.
+  > Loaded via the transformers library.
+  > Model: `openvla-7b-finetuned-libero-10`
+
+- **action_tokenizer**
+  > The original action tokenizer from OpenVLA.
+  > Kept for convenience during code development and reference.
+
+---
+
+### 📁 qwen_actor
 
 - **actor_action_tokenizer**
-  
-  > LLM tokenizer에 openvla의 256개 action token을 추가.
-  > planner의 임베딩 테이블을 가져오고 projection layer를 사용하여 qwen과 차원을 맞춰줌.
-  > Qwen processor와 concat까지 진행.
-  >**setpu**과 **forward** 함수를 보면 됨.
-  
+  > Adds OpenVLA's 256 action tokens to the LLM tokenizer.
+  > Pulls the Planner's embedding table and uses the projection layer to match Qwen's dimensions.
+  > Includes concatenation with the Qwen processor.
+  > Refer to the `setup` and `forward` functions.
+
 - **projection_layer**
-  
-  > openvla와 qwen2.5vl의 토크나이저 임베딩 공간이 달라서 이를 맞춰주기위한 layer.
-  > openvla의 4096차원 action 임베딩을 그냥 넣으면 차원이 안 맞음
-  > 
-  > LLaVA의 projection layer를 참고하여 구현.
+  > A layer to align the embedding spaces of OpenVLA and Qwen2.5-VL, which differ.
+  > Directly inserting OpenVLA's 4096-dim action embeddings causes a dimension mismatch.
+  > Implemented with reference to LLaVA's projection layer.
   >
-  >  **LLaVA** : [LLaVA](https://github.com/haotian-liu/LLaVA/blob/main/llava/model/multimodal_projector/builder.py)
+  > **LLaVA** : [LLaVA](https://github.com/haotian-liu/LLaVA/blob/main/llava/model/multimodal_projector/builder.py)
 
 - **actor_model**
-
-  > qwen에 4bit quantization + LoRA를 적용시키고 zeroMQ와 통합한 actor의 실행파일.
+  > Executable file for the Actor: applies 4bit quantization + LoRA to Qwen, and integrates zeroMQ.
 
 ---
 
-**📁SmolVLM_actor**
+### 📁 SmolVLM_actor
 
 - **smol_action_tokenizer**
-
-  > smolvlm LLM tokenizer에 openvla의 액션 토큰을 이식.
-  > 모델 실행시 토크나이저를 초기화시킴.
+  > Adds OpenVLA's action tokens to SmolVLM's LLM tokenizer.
+  > Initializes the tokenizer when the model is run.
 
 - **smol_actor_model**
-
-  > smol에 4bit quatization + LoRA + zeroMQ 적용.
+  > Applies 4bit quantization + LoRA + zeroMQ to SmolVLM.
 
 - **smol_projection_layer**
-
-  > openvla와 smolvlm의 토크나이저 임베딩 공간을 맞춰줌. 
-  > LLaVA의 prijection layer를 참고함.
+  > Aligns the embedding spaces of OpenVLA and SmolVLM.
+  > Implemented with reference to LLaVA's projection layer.
 
 ---
 
-**📁train_file**
+### 📁 train_file
 
 - **train**
-
-  > main역할을 하는 파일임. GRPO와 LIBERO를 실행.
+  > The main training script. Runs GRPO and LIBERO.
 
 - **smol_train**
-
-  > smolvlm train실행 파일.
-  > GRPO를 RLinf를 통해 구현함.
+  > Training script for SmolVLM.
+  > GRPO is implemented via the RLinf framework.
   >
   > **RLinf** : [RLinf](https://github.com/RLinf/RLinf)
   >
-  > colliect_rollout과 compute_grpo_loss 함수로 학습 진행.
-  > 모델 실행시 해당 파일을 실행해야함.
+  > Training proceeds through the `collect_rollout` and `compute_grpo_loss` functions.
+  > Run this file to execute the model.
 
 - **smol_sft**
-
-  > GRPO강화학습을 진행하기 전 SFT를 통해 모델이 사전 학습을 하도록 유도.
-  > DeepSeek에서 사용한 방식.
-  > 강화학습 모델의 성능이 더 좋아지고, 성능에도 긍정적 효과를 준다고 증명됨.
-  > 여기선 모델의 비판적 텍스트 생성과 7개 액션 토큰 생성 능력을 sft를 통해 학습 시킴.
+  > Pre-trains the model via SFT before GRPO reinforcement learning begins.
+  > This approach follows the method used by DeepSeek.
+  > It has been shown to improve final performance of RL-trained models.
+  > Here, SFT teaches the model two abilities: generating critical text and generating the 7 action tokens.
 
 ---
 
-**📁SFT**
+### 📁 SFT
 
 - **SFT**
-  
-  > GRPO 학습을 들어가기 전 사전 학습을 통해 actor에게 텍스트 포멧 형식을 학습시키기 위함.
+  > Pre-training step before GRPO, used to teach the Actor the expected text format.
 
 ---
 
-**📁assets**
+### 📁 assets
 
 - **make_embeddings.py**
-
-  > openvla action embedding 파라미터를 다운받는 파일.
-  > 모델 실행시키기 전에 무조건 한 번 실행시켜야함.
+  > Downloads the OpenVLA action embedding parameters.
+  > Must be run once before running the model.
 
 ---
 
-**📁checkpoints**
+### 📁 checkpoints
 
 - **sft**
+  > Checkpoint from a completed SFT run.
+  > Used to retrain from this point if the training result is unsatisfactory.
+  > ⚠️ This checkpoint has a bug — the vision encoder was not used. **Not used.**
 
- > SFT를 수행한 모델 체크포인트 파일.
- > train이 마음에 안 들때 해당 체크포인트로 다시 학습.
- > 해당 학습을 시킬 때 비전 인코더를 사용하지 않은 오류가 있음. 사용하지 않음
-
-- **sft2**
-
-  > SFT 수행한 체크포인트.
-  > 비판적 텍스트와 액션 토큰을 추론하는 능력을 기본적으로 학습 시킴.
-  > 해당 체크파일은 비전 인코더 사용 버전으로, 해당 파일 사용.
+- **sft2** ✅ (in use)
+  > SFT checkpoint that teaches the basic ability to infer critical text and action tokens.
+  > This is the vision-encoder version — **this is the file in use**.
 
 ---
 
-**📁logs**
+### 📁 logs
 
-- 학습시 나왔던 로그들을 저장해둠. 어떻게 학습이 되었는지 기록용
+- Training logs are stored here, kept as a record of how training progressed.
 
+---
 
-## ⏬Installation
+## ⏬ Installation
 
-torch version (qwen)
+**Qwen environment**
 
-```
-pip install torch torchvision torchaudio \ --index-url https://download.pytorch.org/whl/cu124
-
+```bash
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
 pip install requirements_qwen.txt --no-deps
-
 git clone https://github.com/Lifelong-Robot-Learning/LIBERO
 ```
 
-torch version (openvla)
+**OpenVLA environment (CPU)**
 
-```
-pip install torch==2.12.0+cpu torchvision==0.27.0+cpu torchaudio==2.11.0+cpu --index-url https://download.pytorch.org/whl/cpu
-
+```bash
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
 pip install requirements_openvla.txt
 ```
 
-SmolVLM 모델 실행시 미리 구성한 qwen 환경에서 실행해도 무방함. 
+> SmolVLM can also be run inside the pre-configured Qwen environment.
 
-## Getting Started
 ---
 
-- 모델을 실행하기 전 openvla_embeddings 파일이 필요함.openvla 환경에 진입해서 
+## Getting Started
 
-```
+**1. Generate the embedding file (required, run once)**
+
+Before running the model, the OpenVLA embeddings file must be generated. Enter the OpenVLA environment:
+
+```bash
 git clone https://github.com/imgonnago/AIproject
-
 conda activate openvla
-
-python make_embeddings.py #embedding파일 생성.
-
+python make_embeddings.py    # generates the embedding file
 python openvla_planner/openvla_inference_code.py
 ```
-- actor 환경 진입 및 실행(SmolVLM도 qwen 환경 사용)
 
-```
+**2. Enter the Actor environment and run training**
+
+SmolVLM also uses the Qwen environment.
+
+```bash
 conda activate qwen
 
-#파일 실행시 openvla를 먼저 실행한 뒤 zeroMQ 서버가 열리고 qwen을 실행해야함.
-
+# Start OpenVLA first so the zeroMQ server is open, then start the Actor side.
 python train/train.py
 ```
 
-## 기타 설정
 ---
 
-모델 실행시 vram 사용량과 train log를 기록할 수 있는 코드.
+## Other Settings
 
-```
-#vram_log
+**Logging VRAM usage and training output**
 
+```bash
+# VRAM log
 nvidia-smi --query-gpu=timestamp,memory.used --format=csv -l 1 >> vram_log.csv &
 
-#train_log
+# Training log
+python train/train.py >> train_log.txt 2>&1
+# or
+python train/smol_train.py >> train_log.txt 2>&1
+```
 
-python train/train.py >> train_log.txt 2>&1  or  python train/smol_train.py >> train_log.txt 2>&1
+**Real-time GPU monitoring** (change the number to control refresh interval in seconds):
 
-"""
-터미널에 입력하면 nvidia 프로세서 정보와 vram 사용량 gpu사용량을 볼 수 있는 코드.
-
-숫자를 바꾸면 해당 초 마다 사용량을 볼 수 있음.
-"""
-
+```bash
 watch -n 0.5 nvidia-smi
+```
 
-#GPU가 어떤 프로세스를 사용하는지 확인할 수 있는 코드.
+**Check which processes are using the GPU:**
 
+```bash
 nvidia-smi pmon -c 1
 ```
 
-vscode에서 계속 SSH서버가 끊어질 때, 우분투에서
+**When the VS Code SSH connection keeps dropping (use tmux on Ubuntu)**
 
-`tmux new -s planner`
+Move into the project folder before running each command.
 
-`conda activate openvla`
+```bash
+# Planner session
+tmux new -s planner
+conda activate openvla
+python openvla_planner/openvla_inference_code.py
 
-실행하기 전 프로젝트 폴더 안으로 이동해서 실행.
-
-`python openvla_planner/openvla_inference_code.py`
-
-`tmux new -s train`
-
-`conda activate qwen`
-
-마찬가지로 프로젝트 폴더 안으로 이동해서 실행.
-```
-#모델 실행 전 이 환경변수를 설정하면 vram에 도움됨.
-PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+# Training session
+tmux new -s train
+conda activate qwen
+python train/smol_train.py
 ```
 
-`nvidia-smi --query-gpu=timestamp,memory.used --format=csv -l 1 >> vram_log.csv &`
+**Helpful VRAM environment variable** (set before running the model):
 
-`python train/smol_train.py 2>&1 | tee train_log.txt`s
+```bash
+export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+```
+
+**Combined VRAM logging + training run:**
+
+```bash
+nvidia-smi --query-gpu=timestamp,memory.used --format=csv -l 1 >> vram_log.csv &
+python train/smol_train.py 2>&1 | tee train_log.txt
+```
