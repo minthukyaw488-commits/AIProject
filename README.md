@@ -201,11 +201,11 @@ tmux new -s train     # start Actor inside another
 
 **My contributions to the project:**
 
-- 🔬 **Framework research** — Investigated RLinf-VLA and identified that it does not directly support Qwen-as-Actor (Qwen2.5-VL is supported only as a VLM in RLinf, not as a robotic action model), informing the team's decision to apply RLinf's rollout/training separation idea rather than swap frameworks.
-- 📊 **VRAM analysis & figures** — Produced VRAM breakdown analysis (activation + gradient as dominant cost), before/after comparison charts, architecture diagrams, and the zeroMQ communication diagram used in team materials.
-- 📝 **Documentation** — Caught and listed typos in the original README (e.g. `setpu` → `setup`, `colliect_rollout` → `collect_rollout`); proposed a cleaned-up, table-driven README structure.
-- 🎤 **Presentation materials** — Built the LIBERO + zeroMQ section of the project presentation, including slides, a Korean speaker script, anticipated Q&A, and supporting figures.
-- 🌐 **Translation & accessibility** — Maintained an English version of the project README (this document) for international readers.
+-  **Framework research** — Investigated RLinf-VLA and identified that it does not directly support Qwen-as-Actor (Qwen2.5-VL is supported only as a VLM in RLinf, not as a robotic action model), informing the team's decision to apply RLinf's rollout/training separation idea rather than swap frameworks.
+-  **VRAM analysis & figures** — Produced VRAM breakdown analysis (activation + gradient as dominant cost), before/after comparison charts, architecture diagrams, and the zeroMQ communication diagram used in team materials.
+-  **Documentation** — Caught and listed typos in the original README (e.g. `setpu` → `setup`, `colliect_rollout` → `collect_rollout`); proposed a cleaned-up, table-driven README structure.
+-  **Presentation materials** — Built the LIBERO + zeroMQ section of the project presentation, including slides, a Korean speaker script, anticipated Q&A, and supporting figures.
+-  **Translation & accessibility** — Maintained an English version of the project README (this document) for international readers.
 
 **What I'm using this repo to study:**
 
