@@ -33,6 +33,32 @@ Single-model VLA systems perform well on short-horizon tasks but degrade sharply
 |  **Process isolation** | Planner (CPU) and Actor (GPU) decoupled via zeroMQ |
 
 ---
+### Motivation & Problem Statement
+Existing single-model VLAs map vision and language directly to robot actions — with no intermediate step where the model checks whether its own proposed action is appropriate. In long-horizon tasks, one early bad decision can cascade into total failure.
+This isn't speculation — it shows up quantitatively in benchmarks. The CoT-VLA paper (Zhao et al., 2025) evaluates several VLAs under identical conditions (3 seeds × 500 episodes). Models without a re-evaluation step score high on short tasks, but collapse to ~50% on LIBERO-Long.
+LIBERO Benchmark — Success Rate by Task (identical evaluation conditions)
+ModelReasoning stepSpatialObjectGoalLongDiffusion PolicyNone78.3%92.5%68.3%50.5%OctoNone78.9%85.7%84.6%51.1%OpenVLA-7BNone84.7%88.4%79.2%53.7%CoT-VLA-7BYes (visual CoT)87.5%91.6%87.6%69.0%
+
+All four numbers are from the same Table 1 in the CoT-VLA paper, evaluated under identical conditions.
+Across different architectures (autoregressive, diffusion), models without an intermediate reasoning step collapse to ~50% on Long tasks. CoT-VLA, which inserts a visual chain-of-thought step, reaches 69.0% on Long — closing most of the gap with shorter tasks. The variable is "presence of a review step before acting."
+Source: Zhao et al., "CoT-VLA: Visual Chain-of-Thought Reasoning for VLA Models", arXiv:2503.22020, Table 1.
+
+→ In short: the presence or absence of a "review and correct" step before acting materially affects long-horizon success.
+This project implements that review step as role separation through a second model (Actor).
+The cause is well-understood — supervised imitation learning is fragile over long sequences because errors compound. A mid-sequence step that re-examines the model's own judgment can break that compounding cycle.
+This project addresses it through role separation:
+
+Planner (OpenVLA) — quickly proposes a first-pass action
+Actor (SmolVLM-500M) — reviews the proposal with critical re-evaluation text and corrects it
+
+A dual-system architecture mirroring a human "think → check → act" flow.
+
+### Project Status
+The architecture and pipeline are fully implemented. Training was carried through to the stages reachable under available compute/time constraints; further training is future work.
+StageStatusDual-system architecture design✅ CompletePlanner (OpenVLA) inference pipeline✅ CompleteActor (SmolVLM-500M) — tokenizer extension + projection layer✅ CompleteZeroMQ inter-process communication✅ CompleteSFT — Actor action-token output + text generation🟡 Partial, qualitatively verifiedGRPO reinforcement learning⬜ Not run (code implemented, large-scale training deferred)LIBERO-Spatial quantitative evaluation⬜ Not run (compute constraints)
+
+The project reached the milestone of "a system that runs end-to-end with its core learning step verified to work as intended."
+Quantitative benchmark results are deferred to future work.
 
 ## Architecture
 
