@@ -66,7 +66,7 @@ The **architecture and pipeline are fully implemented**. Training was carried th
 | ZeroMQ inter-process communication | ✅ Complete |
 | **SFT — Actor action-token output + text generation** | 🟡 Partial, **qualitatively verified** |
 | GRPO reinforcement learning | ⬜ Not run (code implemented, large-scale training deferred) |
-| LIBERO quantitative evaluation | ⬜ Not run (compute constraints) |
+| LIBERO-long evaluation | ⬜ Not run (compute constraints) |
 
 > The project reached the milestone of **"a system that runs end-to-end with its core learning step verified to work as intended."**
 > Quantitative benchmark results are deferred to future work.
